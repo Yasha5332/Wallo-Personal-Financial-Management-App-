@@ -26,11 +26,11 @@ export const Button: React.FC<ButtonProps> = ({
   const getVariantStyles = () => {
     switch (variant) {
       case 'primary':
-        return 'bg-primary active:bg-primary-pressed shadow-sm';
+        return 'bg-primary active:bg-primary-pressed';
       case 'secondary':
         return 'bg-surface-alt border border-border active:bg-border/60';
       case 'danger':
-        return 'bg-danger active:opacity-90 shadow-sm';
+        return 'bg-danger active:opacity-90';
       case 'ghost':
         return 'bg-transparent active:bg-surface-alt';
       default:
@@ -57,10 +57,10 @@ export const Button: React.FC<ButtonProps> = ({
       case 'sm':
         return 'h-10 px-3.5 rounded-md';
       case 'lg':
-        return 'h-14 px-6 rounded-lg';
+        return 'h-14 px-6 rounded-md';
       case 'md':
       default:
-        return 'h-12 px-5 rounded-lg';
+        return 'h-12 px-5 rounded-md';
     }
   };
 

@@ -17,19 +17,14 @@ const TAB_CONFIGS: TabItemConfig[] = [
   { name: 'activity', title: 'Activity', Icon: History },
   { name: 'ledger', title: 'Add', isAction: true },
   { name: 'budgets', title: 'Budget', Icon: PieChart },
-  { name: 'more', title: 'More', Icon: MoreHorizontal },
+  { name: 'more', title: 'Settings', Icon: MoreHorizontal },
 ];
 
 function CustomTabBar({ state, navigation }: any) {
   const { debtBalances } = useFinance();
-  const hasPendingSettlements = debtBalances.length > 0;
   const insets = useSafeAreaInsets();
-
-  const floatingBottomOffset = Math.max(
-    insets.bottom,
-    Platform.select({ ios: 20, android: 14, default: 12 })
-  ) + 4;
-
+  const hasPendingSettlements = debtBalances.length > 0;
+  const bottom = Math.max(insets.bottom, Platform.select({ ios: 16, android: 10, default: 10 })) + 4;
   const currentRouteName = state.routes[state.index]?.name;
 
   return (
@@ -37,65 +32,39 @@ function CustomTabBar({ state, navigation }: any) {
       style={[
         {
           position: 'absolute',
-          bottom: floatingBottomOffset,
-          left: 18,
-          right: 18,
-          height: 68,
-          borderRadius: 34,
+          bottom,
+          left: 16,
+          right: 16,
+          height: 72,
+          borderRadius: 22,
           backgroundColor: '#FFFFFF',
           borderWidth: 1,
-          borderColor: '#F1F5F9',
-          shadowColor: '#0F172A',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.1,
-          shadowRadius: 20,
-          elevation: 12,
+          borderColor: '#E2E4DF',
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-around',
-          paddingHorizontal: 6,
+          paddingHorizontal: 5,
+          shadowColor: '#1C1F1D',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.08,
+          shadowRadius: 16,
+          elevation: 8,
         },
-        Platform.OS === 'web' && {
-          maxWidth: 440,
-          left: 0,
-          right: 0,
-          marginHorizontal: 'auto',
-          width: '90%',
-        },
+        Platform.OS === 'web' && { maxWidth: 480, left: 0, right: 0, marginHorizontal: 'auto', width: '90%' },
       ]}
     >
       {TAB_CONFIGS.map((tab) => {
         const isFocused = currentRouteName === tab.name;
-        const showBadge = tab.name === 'more' && hasPendingSettlements;
+        const Icon = tab.Icon;
 
         const handlePress = () => {
           if (tab.isAction) {
             router.push('/modal/add-transaction');
             return;
           }
-
           const route = state.routes.find((r: any) => r.name === tab.name);
           if (!route) return;
-
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
-
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(tab.name);
-          }
-        };
-
-        const handleLongPress = () => {
-          if (tab.isAction) return;
-          const route = state.routes.find((r: any) => r.name === tab.name);
-          if (!route) return;
-          navigation.emit({
-            type: 'tabLongPress',
-            target: route.key,
-          });
+          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!isFocused && !event.defaultPrevented) navigation.navigate(tab.name);
         };
 
         if (tab.isAction) {
@@ -105,100 +74,32 @@ function CustomTabBar({ state, navigation }: any) {
               onPress={handlePress}
               accessibilityRole="button"
               accessibilityLabel="Add transaction"
-              style={({ pressed }) => [
-                {
-                  flex: 1,
-                  height: 68,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transform: [{ scale: pressed ? 0.92 : 1 }],
-                },
-              ]}
+              style={({ pressed }) => ({ flex: 1, alignItems: 'center', opacity: pressed ? 0.75 : 1 })}
             >
-              <View
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: '#FF6B4A',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  shadowColor: '#FF6B4A',
-                  shadowOffset: { width: 0, height: 3 },
-                  shadowOpacity: 0.35,
-                  shadowRadius: 8,
-                  elevation: 5,
-                }}
-              >
-                <Plus size={22} color="#FFFFFF" strokeWidth={2.8} />
+              <View style={{ width: 44, height: 44, borderRadius: 15, backgroundColor: '#E3A335', alignItems: 'center', justifyContent: 'center' }}>
+                <Plus size={22} color="#1C1F1D" strokeWidth={2.5} />
               </View>
-              <Text
-                className="font-body-semibold text-[10px] text-ink-muted mt-1"
-                numberOfLines={1}
-              >
-                Add
-              </Text>
+              <Text className="font-body-semibold text-[10px] text-ink mt-1">Add</Text>
             </Pressable>
           );
         }
-
-        const Icon = tab.Icon!;
 
         return (
           <Pressable
             key={tab.name}
             onPress={handlePress}
-            onLongPress={handleLongPress}
             accessibilityRole="tab"
             accessibilityLabel={tab.title}
             accessibilityState={{ selected: isFocused }}
-            style={({ pressed }) => [
-              {
-                flex: 1,
-                height: 68,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
+            style={({ pressed }) => ({ flex: 1, alignItems: 'center', opacity: pressed ? 0.7 : 1 })}
           >
-            <View
-              style={{
-                width: 40,
-                height: 32,
-                borderRadius: 16,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: isFocused ? '#FFF1ED' : 'transparent',
-              }}
-            >
-              <Icon
-                size={20}
-                color={isFocused ? '#FF6B4A' : '#94A3B8'}
-                strokeWidth={isFocused ? 2.4 : 1.9}
-              />
-              {showBadge && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: 4,
-                    right: 6,
-                    width: 7,
-                    height: 7,
-                    borderRadius: 3.5,
-                    backgroundColor: '#FF6B4A',
-                    borderWidth: 1.5,
-                    borderColor: '#FFFFFF',
-                  }}
-                />
+            <View style={{ width: 40, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: isFocused ? '#E6EFED' : 'transparent' }}>
+              {Icon && <Icon size={20} color={isFocused ? '#1E3D3C' : '#8A928E'} strokeWidth={isFocused ? 2.4 : 1.8} />}
+              {tab.name === 'more' && hasPendingSettlements && (
+                <View style={{ position: 'absolute', top: 3, right: 7, width: 7, height: 7, borderRadius: 4, backgroundColor: '#E3A335', borderWidth: 1.5, borderColor: '#FFFFFF' }} />
               )}
             </View>
-            <Text
-              className={`text-[10px] mt-0.5 ${
-                isFocused ? 'font-body-bold text-[#FF6B4A]' : 'font-body-medium text-[#94A3B8]'
-              }`}
-              numberOfLines={1}
-            >
+            <Text className={`text-[10px] mt-1 ${isFocused ? 'font-body-semibold text-primary' : 'font-body-medium text-ink-muted'}`}>
               {tab.title}
             </Text>
           </Pressable>
@@ -211,55 +112,17 @@ function CustomTabBar({ state, navigation }: any) {
 export default function TabsLayout() {
   return (
     <Tabs
+      backBehavior="history"
       tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-        sceneStyle: { flex: 1, backgroundColor: '#F7F8FC' },
-      }}
+      screenOptions={{ headerShown: false, sceneStyle: { flex: 1, backgroundColor: '#F3F5F4' } }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-        }}
-      />
-      <Tabs.Screen
-        name="activity"
-        options={{
-          title: 'Activity',
-        }}
-      />
-      <Tabs.Screen
-        name="ledger"
-        options={{
-          title: 'Add',
-        }}
-      />
-      <Tabs.Screen
-        name="budgets"
-        options={{
-          title: 'Budget',
-        }}
-      />
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: 'More',
-        }}
-      />
-      <Tabs.Screen
-        name="shared"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="goals"
-        options={{
-          href: null,
-        }}
-      />
+      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="activity" options={{ title: 'Activity' }} />
+      <Tabs.Screen name="ledger" options={{ title: 'Add' }} />
+      <Tabs.Screen name="budgets" options={{ title: 'Budget' }} />
+      <Tabs.Screen name="more" options={{ title: 'Settings' }} />
+      <Tabs.Screen name="shared" options={{ href: null }} />
+      <Tabs.Screen name="goals" options={{ href: null }} />
     </Tabs>
   );
 }
-

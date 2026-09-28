@@ -11,11 +11,11 @@ export const QuickAddFAB: React.FC<QuickAddFABProps> = ({ className = '' }) => {
   return (
     <Pressable
       onPress={() => router.push('/modal/add-transaction')}
-      className={`absolute bottom-6 right-6 flex-row items-center bg-accent px-4 py-3.5 rounded-pill active:opacity-90 ${className}`}
+      className={`absolute bottom-6 right-6 flex-row items-center bg-primary px-4 py-3.5 rounded-pill active:opacity-90 ${className}`}
       style={{
-        shadowColor: '#FF6B4A',
+        shadowColor: '#1E3D3C',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.35,
+        shadowOpacity: 0.22,
         shadowRadius: 14,
         elevation: 6,
       }}

@@ -7,10 +7,11 @@ import {
   SafeAreaView,
   FlatList,
 } from 'react-native';
+import { router } from 'expo-router';
 import { useFinance } from '../../context/FinanceContext';
 import { Card } from '../../components/ui/Card';
 import { AmountText } from '../../components/ui/AmountText';
-import { BookOpen, ChevronDown, TrendingUp, TrendingDown, ArrowRightLeft } from 'lucide-react-native';
+import { BookOpen, ChevronDown, TrendingUp, TrendingDown, ArrowRightLeft, ArrowLeft } from 'lucide-react-native';
 
 // Mock Chart of Accounts — in a real app this comes from Supabase
 const ACCOUNTS = [
@@ -117,9 +118,27 @@ export default function LedgerScreen() {
       <View className="flex-1" style={{ flex: 1 }}>
         {/* Header */}
         <View className="px-4 pt-3 pb-3">
-          <View className="flex-row items-center mb-4 mt-2">
-            <BookOpen size={22} color="#FF6B4A" strokeWidth={1.8} />
-            <Text className="font-display text-2xl text-ink ml-2">Ledger</Text>
+          <View className="flex-row items-center justify-between mb-4 mt-2">
+            <View className="flex-row items-center flex-1">
+              <Pressable
+                onPress={() => {
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.replace('/(tabs)/more');
+                  }
+                }}
+                hitSlop={10}
+                className="w-9 h-9 rounded-full bg-surface border border-border items-center justify-center mr-3 active:bg-surface-alt shadow-xs"
+                accessibilityLabel="Go back"
+              >
+                <ArrowLeft size={18} color="#0F172A" />
+              </Pressable>
+              <View>
+                <Text className="font-display text-2xl text-ink">General Ledger</Text>
+                <Text className="font-body text-xs text-ink-muted">Double-entry journal & account balances</Text>
+              </View>
+            </View>
           </View>
 
           {/* Account Picker */}
@@ -190,7 +209,7 @@ export default function LedgerScreen() {
             <View className="w-px h-8 bg-border" />
             <View className="items-center flex-1">
               <View className="flex-row items-center mb-0.5">
-                <ArrowRightLeft size={12} color="#FF6B4A" />
+                <ArrowRightLeft size={12} color="#A87317" />
                 <Text className="font-body text-xs text-ink-muted ml-1">Balance</Text>
               </View>
               <AmountText

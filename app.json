@@ -27,7 +27,22 @@
       "expo-router",
       "expo-status-bar",
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Wallo to access your photos to scan and attach receipts.",
+          "cameraPermission": "Allow Wallo to access your camera to scan receipts."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Wallo to access your camera to scan receipts.",
+          "recordAudioAndroid": false
+        }
+      ]
     ]
   }
 }

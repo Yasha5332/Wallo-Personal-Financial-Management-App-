@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useFinance } from '../../context/FinanceContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Card } from '../../components/ui/Card';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { AmountText } from '../../components/ui/AmountText';
@@ -36,12 +37,12 @@ const CATEGORY_EMOJIS: Record<string, string> = {
 
 function getCategoryColor(category: string): string {
   const map: Record<string, string> = {
-    transport: '#0284C7',
-    food: '#F97316',
-    groceries: '#22C55E',
-    entertainment: '#8B5CF6',
-    bills: '#14B8A6',
-    education: '#EC4899',
+    transport: '#4A7A8C',
+    food: '#8C6A4A',
+    groceries: '#6A7A4A',
+    entertainment: '#8C4A6E',
+    bills: '#4A6E8C',
+    education: '#7A6A8C',
   };
   return map[category] || '#64748B';
 }
@@ -61,6 +62,7 @@ export default function BudgetsScreen() {
     totalSubscriptionsCost,
     updateBudgetLimit,
   } = useFinance();
+  const { formatCurrency, currency } = useCurrency();
 
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -72,7 +74,7 @@ export default function BudgetsScreen() {
     if (!editingCategory) return;
     const val = parseFloat(editValue);
     if (!isNaN(val) && val > 0) {
-      updateBudgetLimit(editingCategory, val);
+      updateBudgetLimit({ category: editingCategory, limit_amount: val });
     }
     setEditingCategory(null);
   };
@@ -89,7 +91,7 @@ export default function BudgetsScreen() {
       >
         {/* Header */}
         <View className="flex-row items-center mb-5 mt-2">
-          <PieChart size={22} color="#FF6B4A" strokeWidth={1.8} />
+          <PieChart size={22} color="#1E3D3C" strokeWidth={1.8} />
           <Text className="font-display text-2xl text-ink ml-2">Budgets</Text>
         </View>
 
@@ -99,13 +101,13 @@ export default function BudgetsScreen() {
           <View className="flex-row items-baseline justify-between mb-3">
             <AmountText amount={overallRemaining} size="lg" />
             <Text className="font-body text-xs text-ink-muted">
-              of ${totalBudgetLimit.toFixed(2)} remaining
+              of {formatCurrency(totalBudgetLimit)} remaining
             </Text>
           </View>
           <ProgressBar progress={overallProgress} height={10} />
           <View className="flex-row justify-between mt-2.5">
             <Text className="font-body text-xs text-ink-muted">
-              Spent: ${totalBudgetSpent.toFixed(2)}
+              Spent: {formatCurrency(totalBudgetSpent)}
             </Text>
             {overallProgress >= 0.8 && (
               <View className="flex-row items-center">
@@ -122,8 +124,8 @@ export default function BudgetsScreen() {
         <Text className="font-display text-base text-ink mb-3">Category Budgets</Text>
 
         {budgets.map((budget) => {
-          const progress = budget.limit > 0 ? budget.spent / budget.limit : 0;
-          const remaining = Math.max(0, budget.limit - budget.spent);
+          const progress = budget.limit_amount > 0 ? budget.spent_amount / budget.limit_amount : 0;
+          const remaining = Math.max(0, budget.limit_amount - budget.spent_amount);
           const isWarning = progress >= 0.8 && progress < 1;
           const isOver = progress >= 1;
 
@@ -140,7 +142,7 @@ export default function BudgetsScreen() {
                   <View className="flex-1">
                     <Text className="font-body-semibold text-sm text-ink">{budget.name}</Text>
                     <Text className="font-body text-xs text-ink-muted">
-                      ${budget.spent.toFixed(2)} of ${budget.limit.toFixed(2)}
+                      {formatCurrency(budget.spent_amount)} of {formatCurrency(budget.limit_amount)}
                     </Text>
                   </View>
                 </View>
@@ -166,7 +168,7 @@ export default function BudgetsScreen() {
                   <Pressable
                     onPress={() => {
                       setEditingCategory(budget.category as ExpenseCategory);
-                      setEditValue(budget.limit.toString());
+                      setEditValue(budget.limit_amount.toString());
                     }}
                     className="p-1.5 rounded-lg active:bg-surface-alt"
                     hitSlop={8}
@@ -179,7 +181,7 @@ export default function BudgetsScreen() {
               <ProgressBar progress={progress} height={8} />
 
               <Text className="font-body text-xs text-ink-muted mt-2">
-                ${remaining.toFixed(2)} remaining
+                {formatCurrency(remaining)} remaining
               </Text>
             </Card>
           );
@@ -189,20 +191,20 @@ export default function BudgetsScreen() {
         <View className="mt-4 mb-2">
           <View className="flex-row items-center justify-between mb-3">
             <View className="flex-row items-center">
-              <RefreshCcw size={16} color="#FF6B4A" />
+              <RefreshCcw size={16} color="#1E3D3C" />
               <Text className="font-display text-base text-ink ml-2">Active Subscriptions</Text>
             </View>
             <Text className="font-body-semibold text-sm text-expense">
-              −${totalSubscriptionsCost.toFixed(2)}/mo
+              −{formatCurrency(totalSubscriptionsCost)}/mo
             </Text>
           </View>
 
           {subscriptions.map((sub) => {
             const today = new Date().getDate();
             const daysUntil =
-              sub.renewalDay >= today
-                ? sub.renewalDay - today
-                : 30 - today + sub.renewalDay;
+              sub.renewal_day >= today
+                ? sub.renewal_day - today
+                : 30 - today + sub.renewal_day;
             const isDueSoon = daysUntil <= 3;
 
             return (
@@ -223,7 +225,7 @@ export default function BudgetsScreen() {
                       >
                         {isDueSoon
                           ? `Renews in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`
-                          : `Renews on the ${sub.renewalDay}${ordinal(sub.renewalDay)}`}
+                          : `Renews on the ${sub.renewal_day}${ordinal(sub.renewal_day)}`}
                       </Text>
                     </View>
                   </View>
@@ -259,13 +261,13 @@ export default function BudgetsScreen() {
                   <X size={20} color="#667085" />
                 </Pressable>
               </View>
-              <Text className="font-body text-xs text-ink-muted mb-1">Monthly limit ($)</Text>
+              <Text className="font-body text-xs text-ink-muted mb-1">Monthly limit ({currency.symbol})</Text>
               <TextInput
                 value={editValue}
                 onChangeText={setEditValue}
                 keyboardType="decimal-pad"
                 autoFocus
-                placeholder="0.00"
+                placeholder={currency.decimals === 0 ? '0' : '0.00'}
                 placeholderTextColor="#94A3B8"
                 style={{
                   backgroundColor: '#F8FAFC',
@@ -275,7 +277,7 @@ export default function BudgetsScreen() {
                   height: 52,
                   paddingHorizontal: 14,
                   fontFamily: 'Inter_600SemiBold',
-                  color: '#16202A',
+                  color: '#1C1F1D',
                   fontSize: 16,
                   marginBottom: 16,
                 }}
@@ -296,3 +298,4 @@ export default function BudgetsScreen() {
     </SafeAreaView>
   );
 }
+

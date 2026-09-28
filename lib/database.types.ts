@@ -1,106 +1,44 @@
-// =============================================
-// Database row types matching supabase/schema.sql
-// =============================================
+/**
+ * @deprecated
+ * This file is superseded by the typed model files in lib/models/.
+ * It is kept temporarily as a reference during migration.
+ *
+ * Use the corresponding model file instead:
+ *   DbProfile         → lib/models/profile.model.ts       (ProfileModel)
+ *   DbTransaction     → lib/models/transaction.model.ts   (TransactionModel)
+ *   DbBudget          → lib/models/budget.model.ts        (BudgetModel)
+ *   DbGroup           → lib/models/group.model.ts         (GroupModel)
+ *   DbGroupMember     → lib/models/group.model.ts         (GroupMemberModel)
+ *   DbGroupExpense    → lib/models/group-expense.model.ts (GroupExpenseModel)
+ *   DbGroupDebt       → lib/models/group-expense.model.ts (GroupDebtModel)
+ *
+ * Re-exports everything from the new models to avoid breaking any imports
+ * that have not been migrated yet.
+ */
 
-export interface DbProfile {
-  id: string;
-  name: string;
-  income_pattern: 'fixed_salary' | 'monthly_allowance' | 'semester_lump_sum' | 'no_steady_income';
-  next_income_days: number;
-  next_income_amount: number;
-  next_income_label: string;
-  created_at: string;
-}
+export type { ProfileModel as DbProfile } from './models/profile.model';
+export type { TransactionModel as DbTransaction } from './models/transaction.model';
+export type { BudgetModel as DbBudget } from './models/budget.model';
+export type { SubscriptionModel as DbSubscription } from './models/subscription.model';
+export type { SavingsGoalModel as DbSavingsGoal } from './models/savings-goal.model';
+export type { PayPeriodModel as DbPayPeriod } from './models/pay-period.model';
+export type { GroupModel as DbGroup, GroupMemberModel as DbGroupMember } from './models/group.model';
+export type {
+  GroupExpenseModel as DbGroupExpense,
+  GroupDebtModel as DbGroupDebt,
+} from './models/group-expense.model';
 
-export interface DbAccount {
-  id: string;
-  user_id: string;
-  name: string;
-  type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
-  sub_type: string | null;
-  is_default: boolean;
-  currency: string;
-  created_at: string;
-}
-
+// Legacy types kept for backwards compatibility — remove in v2
 export interface DbJournalEntry {
-  id: string;
-  user_id: string;
-  memo: string | null;
-  posted_at: string;
-  is_void: boolean;
-  source: string;
+  id: string; user_id: string; memo: string | null;
+  posted_at: string; is_void: boolean; source: string;
 }
-
 export interface DbJournalEntryLine {
-  id: string;
-  journal_entry_id: string;
-  account_id: string;
-  debit: number;
-  credit: number;
-  description: string | null;
+  id: string; journal_entry_id: string; account_id: string;
+  debit: number; credit: number; description: string | null;
 }
-
-export interface DbTransaction {
-  id: string;
-  user_id: string;
-  journal_entry_id: string | null;
-  title: string;
-  amount: number;
-  type: 'expense' | 'income';
-  category: string;
-  payment_account_id: string | null;
-  note: string | null;
-  is_recurring: boolean;
-  is_void: boolean;
-  transacted_at: string;
-  created_at: string;
-}
-
-export interface DbBudget {
-  id: string;
-  user_id: string;
-  category: string;
-  name: string;
-  limit_amount: number;
-  period_start: string;
-  created_at: string;
-}
-
-export interface DbGroup {
-  id: string;
-  name: string;
-  created_by: string;
-  created_at: string;
-}
-
-export interface DbGroupMember {
-  id: string;
-  group_id: string;
-  user_id: string | null;
-  display_name: string;
-  avatar_color: string;
-  is_external: boolean;
-  created_at: string;
-}
-
-export interface DbGroupExpense {
-  id: string;
-  group_id: string;
-  title: string;
-  amount: number;
-  paid_by_member_id: string;
-  split_member_ids: string[];
-  category: string;
-  is_settlement: boolean;
-  created_at: string;
-}
-
-export interface DbGroupDebt {
-  id: string;
-  group_id: string;
-  from_member_id: string;
-  to_member_id: string;
-  amount: number;
-  updated_at: string;
+export interface DbAccount {
+  id: string; user_id: string; name: string;
+  type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+  sub_type: string | null; is_default: boolean; currency: string; created_at: string;
 }

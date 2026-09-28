@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "profiles_own" ON profiles;
 CREATE POLICY "profiles_own" ON profiles FOR ALL USING (auth.uid() = id);
 
 -- =============================================
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "accounts_own" ON accounts;
 CREATE POLICY "accounts_own" ON accounts FOR ALL USING (auth.uid() = user_id);
 
 -- =============================================
@@ -54,6 +56,7 @@ CREATE TABLE IF NOT EXISTS journal_entries (
 );
 
 ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "je_own" ON journal_entries;
 CREATE POLICY "je_own" ON journal_entries FOR ALL USING (auth.uid() = user_id);
 
 -- =============================================
@@ -69,6 +72,7 @@ CREATE TABLE IF NOT EXISTS journal_entry_lines (
 );
 
 ALTER TABLE journal_entry_lines ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "jel_own" ON journal_entry_lines;
 CREATE POLICY "jel_own" ON journal_entry_lines
   FOR ALL USING (
     EXISTS (
@@ -98,6 +102,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "tx_own" ON transactions;
 CREATE POLICY "tx_own" ON transactions FOR ALL USING (auth.uid() = user_id);
 
 -- Index for performance
@@ -118,11 +123,14 @@ CREATE TABLE IF NOT EXISTS budgets (
 );
 
 ALTER TABLE budgets ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "budgets_own" ON budgets;
 CREATE POLICY "budgets_own" ON budgets FOR ALL USING (auth.uid() = user_id);
 
 -- =============================================
--- GROUPS (Roommate groups)
+-- GROUPS & SHARED EXPENSES (Tables First)
 -- =============================================
+
+-- Groups table
 CREATE TABLE IF NOT EXISTS groups (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
@@ -130,17 +138,7 @@ CREATE TABLE IF NOT EXISTS groups (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "groups_member" ON groups FOR ALL
-  USING (
-    id IN (
-      SELECT group_id FROM group_members WHERE user_id = auth.uid()
-    )
-  );
-
--- =============================================
--- GROUP MEMBERS
--- =============================================
+-- Group Members table
 CREATE TABLE IF NOT EXISTS group_members (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
@@ -152,17 +150,7 @@ CREATE TABLE IF NOT EXISTS group_members (
   UNIQUE(group_id, user_id)
 );
 
-ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "gm_own" ON group_members FOR ALL
-  USING (
-    group_id IN (
-      SELECT group_id FROM group_members WHERE user_id = auth.uid()
-    )
-  );
-
--- =============================================
--- GROUP EXPENSES (Shared expense log)
--- =============================================
+-- Group Expenses table
 CREATE TABLE IF NOT EXISTS group_expenses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
@@ -175,19 +163,7 @@ CREATE TABLE IF NOT EXISTS group_expenses (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE group_expenses ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "ge_member" ON group_expenses FOR ALL
-  USING (
-    group_id IN (
-      SELECT group_id FROM group_members WHERE user_id = auth.uid()
-    )
-  );
-
--- =============================================
--- GROUP DEBTS (Running pairwise balances — computed view)
--- =============================================
--- This is computed by the app from group_expenses, not stored as a separate table.
--- For MVP, we keep a simple materialized representation:
+-- Group Debts table (Running balances)
 CREATE TABLE IF NOT EXISTS group_debts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
@@ -198,12 +174,48 @@ CREATE TABLE IF NOT EXISTS group_debts (
   UNIQUE(group_id, from_member_id, to_member_id)
 );
 
+-- =============================================
+-- HELPER: Check group membership without infinite RLS recursion
+-- =============================================
+CREATE OR REPLACE FUNCTION is_group_member(p_group_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM group_members
+    WHERE group_id = p_group_id AND user_id = auth.uid()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+-- =============================================
+-- RLS POLICIES FOR GROUPS
+-- =============================================
+ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "groups_member" ON groups;
+CREATE POLICY "groups_member" ON groups FOR ALL
+  USING (
+    created_by = auth.uid() OR is_group_member(id)
+  );
+
+ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "gm_member" ON group_members;
+CREATE POLICY "gm_member" ON group_members FOR ALL
+  USING (
+    user_id = auth.uid() OR is_group_member(group_id)
+  );
+
+ALTER TABLE group_expenses ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "ge_member" ON group_expenses;
+CREATE POLICY "ge_member" ON group_expenses FOR ALL
+  USING (
+    is_group_member(group_id)
+  );
+
 ALTER TABLE group_debts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "gd_member" ON group_debts;
 CREATE POLICY "gd_member" ON group_debts FOR ALL
   USING (
-    group_id IN (
-      SELECT group_id FROM group_members WHERE user_id = auth.uid()
-    )
+    is_group_member(group_id)
   );
 
 -- =============================================
@@ -249,3 +261,150 @@ BEGIN
   ON CONFLICT (user_id, category, period_start) DO NOTHING;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================
+-- PAY PERIODS (Cycle-based Budgeting)
+-- =============================================
+CREATE TABLE IF NOT EXISTS pay_periods (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  income_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  fixed_costs_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  savings_target_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  currency TEXT DEFAULT 'USD',
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE pay_periods ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "pay_periods_own" ON pay_periods;
+CREATE POLICY "pay_periods_own" ON pay_periods FOR ALL USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS pay_periods_user_active ON pay_periods(user_id, is_active);
+
+-- =============================================
+-- SAVINGS GOALS & VAULTS
+-- =============================================
+CREATE TABLE IF NOT EXISTS savings_goals (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  target_amount NUMERIC(12,2) NOT NULL,
+  current_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  target_date TEXT,
+  weekly_suggested NUMERIC(12,2) DEFAULT 0,
+  is_complete BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE savings_goals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "savings_goals_own" ON savings_goals;
+CREATE POLICY "savings_goals_own" ON savings_goals FOR ALL USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS savings_goals_user ON savings_goals(user_id, created_at);
+
+-- =============================================
+-- SUBSCRIPTIONS & RECURRING BILLS
+-- =============================================
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  amount NUMERIC(12,2) NOT NULL,
+  renewal_day INTEGER NOT NULL CHECK (renewal_day BETWEEN 1 AND 31),
+  category TEXT NOT NULL DEFAULT 'bills',
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "subscriptions_own" ON subscriptions;
+CREATE POLICY "subscriptions_own" ON subscriptions FOR ALL USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS subscriptions_user_active ON subscriptions(user_id, is_active);
+
+-- =============================================
+-- DEFAULT PAY PERIOD FUNCTION (RPC)
+-- =============================================
+CREATE OR REPLACE FUNCTION create_default_pay_period(p_user_id UUID)
+RETURNS UUID AS $$
+DECLARE
+  v_period_id UUID;
+  v_now TIMESTAMPTZ := NOW();
+  v_start DATE := DATE_TRUNC('month', v_now)::DATE;
+  v_end DATE := (v_now + INTERVAL '30 days')::DATE;
+BEGIN
+  -- Deactivate any previously active period
+  UPDATE pay_periods SET is_active = FALSE WHERE user_id = p_user_id AND is_active = TRUE;
+
+  INSERT INTO pay_periods (
+    user_id, name, start_date, end_date,
+    income_amount, fixed_costs_amount, savings_target_amount,
+    currency, is_active
+  ) VALUES (
+    p_user_id,
+    TO_CHAR(v_now, 'Month YYYY'),
+    v_start,
+    v_end,
+    750.00,
+    210.00,
+    80.00,
+    'USD',
+    TRUE
+  ) RETURNING id INTO v_period_id;
+
+  RETURN v_period_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================
+-- RECEIPT BATCHES
+-- =============================================
+CREATE TABLE IF NOT EXISTS receipt_batches (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE receipt_batches ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "receipt_batches_own" ON receipt_batches;
+CREATE POLICY "receipt_batches_own" ON receipt_batches FOR ALL USING (auth.uid() = user_id);
+
+-- =============================================
+-- RECEIPTS & OCR DATA
+-- =============================================
+CREATE TABLE IF NOT EXISTS receipts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL,
+  batch_id UUID REFERENCES receipt_batches(id) ON DELETE SET NULL,
+  image_path TEXT NOT NULL,
+  thumbnail_path TEXT,
+  ocr_raw_text TEXT,
+  ocr_source TEXT CHECK (ocr_source IN ('device', 'cloud')) DEFAULT 'device',
+  ocr_confidence_score NUMERIC(3,2) DEFAULT 0.80,
+  merchant_name TEXT,
+  transaction_date DATE,
+  total_amount NUMERIC(12,2),
+  currency TEXT DEFAULT 'VND',
+  category TEXT DEFAULT 'food',
+  processing_status TEXT CHECK (
+    processing_status IN ('pending_review', 'reviewed', 'failed')
+  ) DEFAULT 'pending_review',
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE receipts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "receipts_own" ON receipts;
+CREATE POLICY "receipts_own" ON receipts FOR ALL USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_receipts_user ON receipts(user_id);
+CREATE INDEX IF NOT EXISTS idx_receipts_batch ON receipts(batch_id);
+CREATE INDEX IF NOT EXISTS idx_receipts_status ON receipts(processing_status);
+

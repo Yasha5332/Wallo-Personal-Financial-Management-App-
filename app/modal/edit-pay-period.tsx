@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,16 +25,16 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
-
-const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
+import { useCurrency } from '../../context/CurrencyContext';
 
 export default function EditPayPeriodModal() {
   const { payPeriod, updatePayPeriod, dailyBudgetStats } = useFinance();
+  const { currency, formatCurrency } = useCurrency();
 
-  const [income, setIncome] = useState(payPeriod.incomeAmount.toString());
-  const [fixedCosts, setFixedCosts] = useState(payPeriod.fixedCostsAmount.toString());
-  const [savingsTarget, setSavingsTarget] = useState(payPeriod.savingsTargetAmount.toString());
-  const [daysRemaining, setDaysRemaining] = useState(dailyBudgetStats.daysRemaining.toString());
+  const [income, setIncome] = useState((payPeriod?.income_amount ?? 0).toString());
+  const [fixedCosts, setFixedCosts] = useState((payPeriod?.fixed_costs_amount ?? 0).toString());
+  const [savingsTarget, setSavingsTarget] = useState((payPeriod?.savings_target_amount ?? 0).toString());
+  const [daysRemaining, setDaysRemaining] = useState((dailyBudgetStats?.daysRemaining ?? 30).toString());
   const [error, setError] = useState('');
 
   const numIncome = parseFloat(income) || 0;
@@ -44,10 +44,21 @@ export default function EditPayPeriodModal() {
 
   // Live preview computations
   const previewSpendablePot = Math.max(0, numIncome - numFixed - numSavings);
-  const previewRemainingPot = previewSpendablePot - dailyBudgetStats.totalExpenses;
+  const previewRemainingPot = previewSpendablePot - (dailyBudgetStats?.totalExpenses ?? 0);
   const previewDailyLimit =
     numDays > 0 && previewRemainingPot > 0 ? previewRemainingPot / numDays : 0;
   const isNegativePot = numIncome < numFixed + numSavings;
+
+  const isDismissing = useRef(false);
+  const handleDismiss = () => {
+    if (isDismissing.current) return;
+    isDismissing.current = true;
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)');
+    }
+  };
 
   const handleSave = () => {
     if (numIncome <= 0) {
@@ -59,14 +70,16 @@ export default function EditPayPeriodModal() {
     const newEndDate = new Date(now.getTime() + numDays * 24 * 60 * 60 * 1000).toISOString();
 
     updatePayPeriod({
-      incomeAmount: numIncome,
-      fixedCostsAmount: numFixed,
-      savingsTargetAmount: numSavings,
-      endDate: newEndDate,
+      income_amount: numIncome,
+      fixed_costs_amount: numFixed,
+      savings_target_amount: numSavings,
+      end_date: newEndDate.slice(0, 10),
     });
 
-    router.back();
+    handleDismiss();
   };
+
+  const handleClose = handleDismiss;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F8FC' }}>
@@ -89,7 +102,7 @@ export default function EditPayPeriodModal() {
               </Text>
             </View>
             <Pressable
-              onPress={() => router.back()}
+              onPress={handleClose}
               hitSlop={8}
               className="w-9 h-9 rounded-full bg-surface border border-border items-center justify-center active:bg-surface-alt"
             >
@@ -221,7 +234,7 @@ export default function EditPayPeriodModal() {
                 <View className="flex-1">
                   <Text className="font-body text-[10px] text-slate-400">Spent so far</Text>
                   <Text className="font-body-semibold text-xs text-rose-300 mt-0.5">
-                    {formatCurrency(dailyBudgetStats.totalExpenses)}
+                    {formatCurrency(dailyBudgetStats?.totalExpenses ?? 0)}
                   </Text>
                 </View>
                 <View className="w-px bg-white/15" />
@@ -260,14 +273,14 @@ export default function EditPayPeriodModal() {
                 <Text className="font-body text-[11px] text-ink-muted">Total for period</Text>
               </View>
               <View className="flex-row items-center bg-surface-alt border border-border rounded-xl px-3 h-12">
-                <DollarSign size={16} color="#FF6B4A" />
+                <Text className="font-display-bold text-sm text-primary">{currency.symbol}</Text>
                 <TextInput
                   value={income}
                   onChangeText={(val) => {
                     setIncome(val);
                     setError('');
                   }}
-                  placeholder="0.00"
+                  placeholder={currency.decimals === 0 ? '0' : '0.00'}
                   keyboardType="numeric"
                   className="flex-1 ml-2 font-display text-base text-ink"
                   placeholderTextColor="#94A3B8"
@@ -289,7 +302,7 @@ export default function EditPayPeriodModal() {
                     setFixedCosts(val);
                     setError('');
                   }}
-                  placeholder="0.00"
+                  placeholder={currency.decimals === 0 ? '0' : '0.00'}
                   keyboardType="numeric"
                   className="flex-1 ml-2 font-display text-base text-ink"
                   placeholderTextColor="#94A3B8"
@@ -311,7 +324,7 @@ export default function EditPayPeriodModal() {
                     setSavingsTarget(val);
                     setError('');
                   }}
-                  placeholder="0.00"
+                  placeholder={currency.decimals === 0 ? '0' : '0.00'}
                   keyboardType="numeric"
                   className="flex-1 ml-2 font-display text-base text-ink"
                   placeholderTextColor="#94A3B8"

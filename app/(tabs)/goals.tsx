@@ -9,15 +9,29 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useFinance } from '../../context/FinanceContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Target, Plus, X, Calendar, Lightbulb, ArrowLeft, CheckCircle2 } from 'lucide-react-native';
+import {
+  Target,
+  Plus,
+  X,
+  Calendar,
+  Lightbulb,
+  ArrowLeft,
+  CheckCircle2,
+  Pencil,
+  Trash2,
+} from 'lucide-react-native';
+import type { SavingsGoalModel } from '../../lib/models/savings-goal.model';
 
 export default function GoalsScreen() {
-  const { savingsGoals, addSavingsGoal, contributeToGoal } = useFinance();
+  const { savingsGoals, addSavingsGoal, updateSavingsGoal, deleteSavingsGoal, contributeToGoal } = useFinance();
+  const { formatCurrency, currency } = useCurrency();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showContributeModal, setShowContributeModal] = useState<string | null>(null);
@@ -25,6 +39,12 @@ export default function GoalsScreen() {
   const [newGoalTarget, setNewGoalTarget] = useState('');
   const [newGoalDate, setNewGoalDate] = useState('');
   const [contributeAmount, setContributeAmount] = useState('');
+
+  // Edit Goal State
+  const [editingGoal, setEditingGoal] = useState<SavingsGoalModel | null>(null);
+  const [editGoalTitle, setEditGoalTitle] = useState('');
+  const [editGoalTarget, setEditGoalTarget] = useState('');
+  const [editGoalDate, setEditGoalDate] = useState('');
 
   const handleAddGoal = () => {
     const target = parseFloat(newGoalTarget);
@@ -34,9 +54,9 @@ export default function GoalsScreen() {
       : 12;
     addSavingsGoal({
       title: newGoalTitle.trim(),
-      targetAmount: target,
-      targetDate: newGoalDate || 'Open-ended',
-      weeklySuggested: parseFloat((target / weeks).toFixed(2)),
+      target_amount: target,
+      target_date: newGoalDate || 'Open-ended',
+      weekly_suggested: parseFloat((target / weeks).toFixed(2)),
     });
     setNewGoalTitle('');
     setNewGoalTarget('');
@@ -44,17 +64,59 @@ export default function GoalsScreen() {
     setShowAddModal(false);
   };
 
+  const handleOpenEdit = (goal: SavingsGoalModel) => {
+    setEditingGoal(goal);
+    setEditGoalTitle(goal.title);
+    setEditGoalTarget(goal.target_amount.toString());
+    setEditGoalDate(goal.target_date === 'Open-ended' ? '' : (goal.target_date || ''));
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingGoal) return;
+    const target = parseFloat(editGoalTarget);
+    if (!editGoalTitle.trim() || isNaN(target) || target <= 0) return;
+    const weeks = editGoalDate
+      ? Math.max(1, Math.ceil((new Date(editGoalDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000)))
+      : 12;
+
+    updateSavingsGoal({
+      id: editingGoal.id,
+      title: editGoalTitle.trim(),
+      target_amount: target,
+      target_date: editGoalDate.trim() || 'Open-ended',
+      weekly_suggested: parseFloat((target / weeks).toFixed(2)),
+    });
+    setEditingGoal(null);
+  };
+
+  const handleDeleteGoal = (goalId: string, title: string) => {
+    const doDelete = () => {
+      deleteSavingsGoal(goalId);
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Delete savings goal "${title}"?`)) {
+        doDelete();
+      }
+    } else {
+      Alert.alert('Delete Goal', `Are you sure you want to delete "${title}"?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
+    }
+  };
+
   const handleContribute = (goalId: string) => {
     const amount = parseFloat(contributeAmount);
     if (!isNaN(amount) && amount > 0) {
-      contributeToGoal(goalId, amount);
+      contributeToGoal({ goal_id: goalId, amount });
     }
     setContributeAmount('');
     setShowContributeModal(null);
   };
 
-  const totalSavedAll = savingsGoals.reduce((sum, g) => sum + g.currentAmount, 0);
-  const totalTargetAll = savingsGoals.reduce((sum, g) => sum + g.targetAmount, 0);
+  const totalSavedAll = savingsGoals.reduce((sum, g) => sum + g.current_amount, 0);
+  const totalTargetAll = savingsGoals.reduce((sum, g) => sum + g.target_amount, 0);
   const totalPctAll = totalTargetAll > 0 ? Math.round((totalSavedAll / totalTargetAll) * 100) : 0;
 
   return (
@@ -84,7 +146,7 @@ export default function GoalsScreen() {
           </View>
           <Pressable
             onPress={() => setShowAddModal(true)}
-            className="flex-row items-center bg-primary px-3.5 py-2 rounded-xl active:bg-primary-pressed shadow-sm"
+            className="flex-row items-center bg-primary px-3.5 py-2 rounded-md active:bg-primary-pressed"
           >
             <Plus size={16} color="#FFFFFF" />
             <Text className="font-body-semibold text-xs text-surface ml-1.5">New Goal</Text>
@@ -106,9 +168,9 @@ export default function GoalsScreen() {
             <View>
               <Text className="font-body text-xs text-ink-muted">Total Saved for Goals</Text>
               <Text className="font-display text-xl text-ink mt-0.5 font-bold">
-                ${totalSavedAll.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                {formatCurrency(totalSavedAll)}
                 <Text className="font-body text-xs text-ink-muted font-normal">
-                  {' '}of ${totalTargetAll.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  {' '}of {formatCurrency(totalTargetAll)}
                 </Text>
               </Text>
             </View>
@@ -134,26 +196,26 @@ export default function GoalsScreen() {
           </Card>
         ) : (
           savingsGoals.map((goal) => {
-            const progress = goal.targetAmount > 0 ? goal.currentAmount / goal.targetAmount : 0;
-            const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
+            const progress = goal.target_amount > 0 ? goal.current_amount / goal.target_amount : 0;
+            const remaining = Math.max(0, goal.target_amount - goal.current_amount);
             const pct = Math.round(progress * 100);
             const isComplete = progress >= 1;
 
             return (
               <Card key={goal.id} className="mb-3 p-4">
-                {/* Top Row: Icon, Title & Quick Action */}
+                {/* Top Row: Icon, Title & Quick Actions */}
                 <View className="flex-row items-center justify-between mb-3">
                   <View className="flex-row items-center flex-1 mr-2">
                     <View
                       className="w-10 h-10 rounded-2xl items-center justify-center mr-3"
                       style={{
-                        backgroundColor: isComplete ? '#ECFDF5' : '#FFF1ED',
+                        backgroundColor: isComplete ? '#E6EFED' : '#FBF2DE',
                       }}
                     >
                       {isComplete ? (
                         <CheckCircle2 size={20} color="#10B981" />
                       ) : (
-                        <Target size={20} color="#FF6B4A" />
+                        <Target size={20} color="#A87317" />
                       )}
                     </View>
                     <View className="flex-1">
@@ -163,28 +225,49 @@ export default function GoalsScreen() {
                       <Text className="font-body text-xs text-ink-muted mt-0.5" numberOfLines={1}>
                         {isComplete
                           ? 'Goal reached! 🎉'
-                          : `${goal.targetDate && goal.targetDate !== 'Open-ended' ? `Due ${goal.targetDate}` : 'Ongoing'}${goal.weeklySuggested > 0 ? ` · $${Math.round(goal.weeklySuggested)}/wk` : ''}`}
+                          : `${goal.target_date && goal.target_date !== 'Open-ended' ? `Due ${goal.target_date}` : 'Ongoing'}${goal.weekly_suggested > 0 ? ` · ${formatCurrency(Math.round(goal.weekly_suggested))}/wk` : ''}`}
                       </Text>
                     </View>
                   </View>
 
-                  {isComplete ? (
-                    <View className="bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                      <Text className="font-body-semibold text-xs text-emerald-600">Reached</Text>
-                    </View>
-                  ) : (
+                  {/* Actions: Add / Edit / Delete */}
+                  <View className="flex-row items-center" style={{ gap: 6 }}>
+                    {isComplete ? (
+                      <View className="bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                        <Text className="font-body-semibold text-xs text-emerald-600">Reached</Text>
+                      </View>
+                    ) : (
+                      <Pressable
+                        onPress={() => {
+                          setShowContributeModal(goal.id);
+                          setContributeAmount('');
+                        }}
+                        hitSlop={8}
+                        className="flex-row items-center bg-secondary/15 active:bg-secondary/25 px-2.5 py-1.5 rounded-full"
+                      >
+                        <Plus size={13} color="#A87317" strokeWidth={2.5} />
+                        <Text className="font-body-semibold text-xs text-secondary ml-1">Add</Text>
+                      </Pressable>
+                    )}
+
                     <Pressable
-                      onPress={() => {
-                        setShowContributeModal(goal.id);
-                        setContributeAmount('');
-                      }}
+                      onPress={() => handleOpenEdit(goal)}
                       hitSlop={8}
-                      className="flex-row items-center bg-secondary/15 hover:bg-secondary/20 active:bg-secondary/25 px-3 py-1.5 rounded-full"
+                      className="p-1.5 rounded-lg active:bg-surface-alt"
+                      accessibilityLabel={`Edit ${goal.title}`}
                     >
-                      <Plus size={13} color="#FF6B4A" strokeWidth={2.5} />
-                      <Text className="font-body-semibold text-xs text-secondary ml-1">Add</Text>
+                      <Pencil size={15} color="#64748B" />
                     </Pressable>
-                  )}
+
+                    <Pressable
+                      onPress={() => handleDeleteGoal(goal.id, goal.title)}
+                      hitSlop={8}
+                      className="p-1.5 rounded-lg active:bg-rose-50"
+                      accessibilityLabel={`Delete ${goal.title}`}
+                    >
+                      <Trash2 size={15} color="#E11D48" />
+                    </Pressable>
+                  </View>
                 </View>
 
                 {/* Progress bar */}
@@ -193,7 +276,7 @@ export default function GoalsScreen() {
                     className="h-full rounded-full"
                     style={{
                       width: `${Math.min(pct, 100)}%`,
-                      backgroundColor: isComplete ? '#10B981' : '#FF6B4A',
+                      backgroundColor: isComplete ? '#2F8F6B' : '#E3A335',
                     }}
                   />
                 </View>
@@ -202,20 +285,20 @@ export default function GoalsScreen() {
                 <View className="flex-row items-center justify-between">
                   <View className="flex-row items-baseline">
                     <Text className="font-display text-sm text-ink font-semibold">
-                      ${goal.currentAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      {formatCurrency(goal.current_amount)}
                     </Text>
                     <Text className="font-body text-xs text-ink-muted ml-1">
-                      of ${goal.targetAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      of {formatCurrency(goal.target_amount)}
                     </Text>
                     {!isComplete && remaining > 0 && (
                       <Text className="font-body text-xs text-ink-muted/70 ml-1.5">
-                        (${remaining.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} left)
+                        ({formatCurrency(remaining)} left)
                       </Text>
                     )}
                   </View>
                   <Text
                     className="font-body-semibold text-xs"
-                    style={{ color: isComplete ? '#10B981' : '#FF6B4A' }}
+                    style={{ color: isComplete ? '#2F8F6B' : '#A87317' }}
                   >
                     {pct}%
                   </Text>
@@ -266,12 +349,14 @@ export default function GoalsScreen() {
                 style={inputStyle}
               />
 
-              <Text className="font-body text-xs text-ink-muted mb-1 mt-3">Target amount ($)</Text>
+              <Text className="font-body text-xs text-ink-muted mb-1 mt-3">
+                Target amount ({currency.symbol})
+              </Text>
               <TextInput
                 value={newGoalTarget}
                 onChangeText={setNewGoalTarget}
                 keyboardType="decimal-pad"
-                placeholder="0.00"
+                placeholder={currency.decimals === 0 ? '0' : '0.00'}
                 placeholderTextColor="#667085"
                 style={inputStyle}
               />
@@ -301,6 +386,83 @@ export default function GoalsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Edit Goal Modal */}
+      <Modal
+        visible={editingGoal !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditingGoal(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <Pressable
+            style={{ flex: 1, backgroundColor: 'rgba(28,31,29,0.3)', justifyContent: 'flex-end' }}
+            onPress={() => setEditingGoal(null)}
+          >
+            <Pressable
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 24,
+                paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+              }}
+            >
+              <View className="flex-row items-center justify-between mb-6">
+                <Text className="font-display text-lg text-ink">Edit Savings Goal</Text>
+                <Pressable onPress={() => setEditingGoal(null)} hitSlop={8}>
+                  <X size={22} color="#667085" />
+                </Pressable>
+              </View>
+
+              <Text className="font-body text-xs text-ink-muted mb-1">Goal title</Text>
+              <TextInput
+                value={editGoalTitle}
+                onChangeText={setEditGoalTitle}
+                placeholder="e.g. New laptop, Summer trip..."
+                placeholderTextColor="#667085"
+                style={inputStyle}
+              />
+
+              <Text className="font-body text-xs text-ink-muted mb-1 mt-3">
+                Target amount ({currency.symbol})
+              </Text>
+              <TextInput
+                value={editGoalTarget}
+                onChangeText={setEditGoalTarget}
+                keyboardType="decimal-pad"
+                placeholder={currency.decimals === 0 ? '0' : '0.00'}
+                placeholderTextColor="#667085"
+                style={inputStyle}
+              />
+
+              <Text className="font-body text-xs text-ink-muted mb-1 mt-3">
+                Target date (optional, e.g. Dec 15, 2026)
+              </Text>
+              <TextInput
+                value={editGoalDate}
+                onChangeText={setEditGoalDate}
+                placeholder="e.g. Mar 20, 2027"
+                placeholderTextColor="#94A3B8"
+                style={inputStyle}
+              />
+
+              <View className="flex-row mt-6" style={{ gap: 12 }}>
+                <Button
+                  label="Cancel"
+                  variant="secondary"
+                  onPress={() => setEditingGoal(null)}
+                  className="flex-1"
+                />
+                <Button label="Save Changes" onPress={handleSaveEdit} className="flex-1" />
+              </View>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Contribute Modal */}
       <Modal
         visible={showContributeModal !== null}
@@ -323,13 +485,15 @@ export default function GoalsScreen() {
                   <X size={20} color="#667085" />
                 </Pressable>
               </View>
-              <Text className="font-body text-xs text-ink-muted mb-1">Amount to add ($)</Text>
+              <Text className="font-body text-xs text-ink-muted mb-1">
+                Amount to add ({currency.symbol})
+              </Text>
               <TextInput
                 value={contributeAmount}
                 onChangeText={setContributeAmount}
                 keyboardType="decimal-pad"
                 autoFocus
-                placeholder="0.00"
+                placeholder={currency.decimals === 0 ? '0' : '0.00'}
                 placeholderTextColor="#667085"
                 style={{ ...inputStyle, marginBottom: 16 }}
               />
@@ -365,3 +529,4 @@ const inputStyle = {
   color: '#16202A',
   fontSize: 15,
 };
+

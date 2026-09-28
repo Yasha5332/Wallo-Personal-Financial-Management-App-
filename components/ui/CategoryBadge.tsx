@@ -25,17 +25,17 @@ const CATEGORY_META: Record<
   string,
   { label: string; color: string; icon: React.ComponentType<{ size: number; color: string }> }
 > = {
-  food: { label: 'Food & Dining', color: '#F97316', icon: Coffee },
-  groceries: { label: 'Groceries', color: '#22C55E', icon: ShoppingBag },
-  transport: { label: 'Transport', color: '#3B82F6', icon: Bus },
-  entertainment: { label: 'Entertainment', color: '#8B5CF6', icon: Film },
-  bills: { label: 'Bills & Utilities', color: '#14B8A6', icon: Zap },
-  education: { label: 'Campus & Books', color: '#EC4899', icon: BookOpen },
-  allowance: { label: 'Allowance', color: '#12B76A', icon: DollarSign },
-  part_time: { label: 'Part-Time Job', color: '#059669', icon: Briefcase },
-  scholarship: { label: 'Scholarship', color: '#14B8A6', icon: Award },
-  loan_aid: { label: 'Financial Aid', color: '#3B82F6', icon: CircleDollarSign },
-  other: { label: 'General', color: '#667085', icon: DollarSign },
+  food: { label: 'Food & Dining', color: '#8C6A4A', icon: Coffee },
+  groceries: { label: 'Groceries', color: '#6A7A4A', icon: ShoppingBag },
+  transport: { label: 'Transport', color: '#4A7A8C', icon: Bus },
+  entertainment: { label: 'Entertainment', color: '#8C4A6E', icon: Film },
+  bills: { label: 'Bills & Utilities', color: '#4A6E8C', icon: Zap },
+  education: { label: 'Campus & Books', color: '#7A6A8C', icon: BookOpen },
+  allowance: { label: 'Allowance', color: '#2F8F6B', icon: DollarSign },
+  part_time: { label: 'Part-Time Job', color: '#2F8F6B', icon: Briefcase },
+  scholarship: { label: 'Scholarship', color: '#4A6E8C', icon: Award },
+  loan_aid: { label: 'Financial Aid', color: '#4A7A8C', icon: CircleDollarSign },
+  other: { label: 'General', color: '#6B7370', icon: DollarSign },
 };
 
 export const CategoryBadge: React.FC<CategoryBadgeProps> = ({

@@ -27,17 +27,8 @@ export const Card: React.FC<CardProps> = ({
 
   return (
     <View
-      className={`rounded-3xl p-5 ${getVariantStyles()} ${className}`}
-      style={[
-        {
-          shadowColor: '#151A2D',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.04,
-          shadowRadius: 8,
-          elevation: 1,
-        },
-        style,
-      ]}
+      className={`rounded-lg p-4 ${getVariantStyles()} ${className}`}
+      style={style}
       {...props}
     >
       {children}

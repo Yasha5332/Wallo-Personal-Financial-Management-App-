@@ -1,11 +1,16 @@
 import React from 'react';
 import { Text, TextProps } from 'react-native';
+import { useCurrency } from '../../context/CurrencyContext';
 
-interface AmountTextProps extends TextProps {
+export interface AmountTextProps extends TextProps {
   amount: number;
   type?: 'expense' | 'income' | 'neutral';
   size?: 'sm' | 'md' | 'lg' | 'display';
   showSign?: boolean;
+  compact?: boolean;
+  currencyCode?: string;
+  fromCurrency?: string;
+  skipConversion?: boolean;
   className?: string;
 }
 
@@ -14,21 +19,24 @@ export const AmountText: React.FC<AmountTextProps> = ({
   type = 'neutral',
   size = 'md',
   showSign = false,
+  compact = false,
+  currencyCode,
+  fromCurrency,
+  skipConversion = false,
   className = '',
   style,
   ...props
 }) => {
-  const formatted = Math.abs(amount).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const { formatCurrency } = useCurrency();
 
-  const getSign = () => {
-    if (!showSign) return '';
-    if (type === 'income') return '+';
-    if (type === 'expense') return '−';
-    return '';
-  };
+  const formatted = formatCurrency(amount, {
+    showSign,
+    type,
+    compact,
+    fromCurrency,
+    toCurrency: currencyCode,
+    skipConversion,
+  });
 
   const getColorClass = () => {
     switch (type) {
@@ -62,7 +70,7 @@ export const AmountText: React.FC<AmountTextProps> = ({
       style={[{ fontVariant: ['tabular-nums'], letterSpacing: size === 'display' ? -1 : -0.2 }, style]}
       {...props}
     >
-      {getSign()}${formatted}
+      {formatted}
     </Text>
   );
 };
